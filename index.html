@@ -187,6 +187,7 @@ function handle(msg){
  if(o.type==='cards' && Array.isArray(o.cards)){
 
    state.mode='news';
+    state.auto=true;
 
    state.items=o.cards.map(x =>
      typeof x==='string' ? {title:x} : x
@@ -222,6 +223,9 @@ function handle(msg){
 
      $('tag').textContent =
        current.tag || 'LIVE NEWS';
+
+     $('location').textContent =
+       current.body || state.location || '';
 
      if(current.image){
        setBackground(current.image);
@@ -362,39 +366,28 @@ function rotate(){
 
  state.index=(state.index+1)%state.items.length;
  state.ticks=(state.ticks||0)+1;
- $('status').textContent='ROTATE '+state.ticks+' • INDEX '+state.index+' • '+state.items.length+' CARDS';
 
  const item=state.items[state.index];
-
  if(!item)return;
 
- /*
-  * Show the CURRENT story as the main ambient content.
-  */
  $('title').textContent =
    item.title || 'Ambient News';
 
  $('tag').textContent =
    item.tag || 'LIVE NEWS';
 
- /*
-  * Put the story description below the headline
-  * when the sender supplied one.
-  */
  $('location').textContent =
-   item.description || state.location || '';
+   item.body || state.location || '';
 
- /*
-  * Use the story image when available.
-  */
  if(item.image){
    setBackground(item.image);
+ }else{
+   $('bg').style.backgroundImage='none';
  }
 
- /*
-  * Keep the 8-card overview synchronized with
-  * the currently displayed story.
-  */
+ $('mode').textContent =
+   'NEWS • '+(state.index+1)+' / '+state.items.length;
+
  $('cards').innerHTML=state.items
    .map((x,i)=>
      '<div class="card" style="' +
@@ -408,13 +401,17 @@ function rotate(){
    )
    .join('');
 
- $('mode').textContent =
-   'NEWS • '+(state.index+1)+' / '+state.items.length;
+ $('status').textContent =
+   'AUTO • ARTICLE '+(state.index+1)+' / '+state.items.length;
 }
 
 function restartRotation(){
  clearInterval(state.rotation);
- state.rotation=setInterval(rotate,state.interval);
+
+ state.rotation=setInterval(
+   rotate,
+   Math.max(5000, state.interval || 15000)
+ );
 }
 render();
 restartRotation();
