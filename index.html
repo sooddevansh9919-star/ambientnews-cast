@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ambient News</title>
+<style>
+:root{--bg:#061525;--panel:#0b2033;--text:#f5f8fb;--muted:#9bb6ce;--accent:#76b7ff}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;color:var(--text);font-family:Arial,Helvetica,sans-serif}
+#app{position:relative;width:100%;height:100%;background:linear-gradient(135deg,#061525,#092a45);overflow:hidden}
+#bg{position:absolute;inset:0;background-size:cover;background-position:center;filter:brightness(.62);transition:opacity .8s}
+#shade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(0,12,24,.9),rgba(0,12,24,.55),rgba(0,12,24,.22))}
+#content{position:relative;z-index:2;padding:4.5vh 4vw;width:100%;height:100%}
+h1{margin:0;font-size:5.4vw;letter-spacing:.02em} .sub{font-size:2.1vw;color:var(--muted);margin:.7vh 0}
+#clock{position:absolute;right:4vw;top:4vh;font-size:4vw;font-weight:300}
+#cards{margin-top:3vh;display:grid;gap:1.05vh;max-width:92vw}
+.card{background:rgba(6,24,40,.82);border:1px solid rgba(255,255,255,.06);border-radius:1.1vw;padding:1.1vh 1.5vw;font-size:2.15vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.num{display:inline-block;width:2.6vw;color:#fff}
+#footer{position:absolute;left:4vw;bottom:3vh;color:#9bb6ce;font-size:1.6vw}
+#mode{position:absolute;right:4vw;bottom:3vh;font-size:1.6vw;color:#76b7ff}
+#hero{display:none;position:absolute;inset:0;z-index:5;padding:7vh 7vw;align-items:flex-end;background:rgba(0,0,0,.18)}
+#hero .box{max-width:82vw;text-shadow:0 2px 12px #000}
+#hero h2{font-size:5vw;margin:0 0 1vh}.heroText{font-size:2.2vw;color:#e5eef7}
+#bigClock{display:none;position:absolute;inset:0;z-index:6;align-items:center;justify-content:center;flex-direction:column;background:rgba(0,0,0,.18)}
+#bigClock .time{font-size:15vw;font-weight:200}.date{font-size:3vw;color:var(--muted)}
+#trivia{display:none;position:absolute;inset:0;z-index:6;padding:9vh 8vw;background:linear-gradient(135deg,#102b45,#071827)}
+#trivia h2{font-size:4.8vw;margin:0 0 4vh}.q{font-size:3.1vw;margin-bottom:3vh}.answers{display:grid;gap:1.2vh}.ans{font-size:2.3vw;padding:1.5vh 2vw;background:rgba(255,255,255,.08);border-radius:1vw}
+#status{position:absolute;top:1vh;left:1vw;z-index:20;font-size:1vw;color:rgba(255,255,255,.5)}
+</style>
+</head>
+<body>
+<div id="app">
+ <div id="bg"></div><div id="shade"></div>
+ <div id="content">
+  <div id="clock">--:--</div>
+  <h1 id="title">AMBIENT NEWS</h1>
+  <div class="sub" id="tag">LIVE CONTENT • CHROMECAST AMBIENT</div>
+  <div class="sub" id="location">LOCATION • DELHI • INDIA</div>
+  <div id="cards"></div>
+  <div id="footer">Ambient display • tap a card to cast • automatic rotation</div>
+  <div id="mode">NEWS</div>
+ </div>
+ <div id="hero"><div class="box"><h2 id="heroTitle"></h2><div class="heroText" id="heroText"></div></div></div>
+ <div id="bigClock"><div class="time" id="bigTime"></div><div class="date" id="bigDate"></div></div>
+ <div id="trivia"><h2>TRIVIA</h2><div class="q" id="question"></div><div class="answers" id="answers"></div></div>
+ <div id="status">receiver ready</div>
+</div>
+<script src="//www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
+<script>
+(function(){
+'use strict';
+const NS='urn:x-cast:com.ambientnews.cast';
+const $=id=>document.getElementById(id);
+const state={mode:'news',auto:true,items:[],index:0,interval:15000,rotation:null,location:'Delhi • India'};
+const trivia=[
+ ['Which planet is known as the Red Planet?',['Earth','Mars','Venus','Jupiter'],1],
+ ['What is the largest animal on Earth?',['Elephant','Blue whale','Giraffe','Shark'],1],
+ ['How many continents are there?',['5','6','7','8'],2],
+ ['Which gas do plants absorb?',['Oxygen','Nitrogen','Carbon dioxide','Helium'],2],
+ ['What is the fastest land animal?',['Lion','Cheetah','Horse','Tiger'],1],
+ ['Which ocean is the largest?',['Atlantic','Indian','Pacific','Arctic'],2],
+ ['What is the capital of India?',['Mumbai','Delhi','Kolkata','Chennai'],1],
+ ['Which animal is famous for black-and-white stripes?',['Panda','Zebra','Penguin','Skunk'],1]
+];
+const fallback=[
+ 'Global headlines and major world developments',
+ 'India • technology • business • science',
+ 'Weather, travel and important local updates',
+ 'Space discoveries and science stories',
+ 'Gaming • movies • entertainment',
+ 'Wildlife and nature highlights',
+ 'Kids learning • fun facts • trivia',
+ 'Anime • wallpapers • visual inspiration'
+];
+const feeds=[
+ 'https://feeds.bbci.co.uk/news/world/rss.xml',
+ 'https://feeds.bbci.co.uk/news/technology/rss.xml',
+ 'https://feeds.bbci.co.uk/news/science_and_environment/rss.xml'
+];
+function clock(){
+ const d=new Date();
+ $('clock').textContent=d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:false});
+ if(state.mode==='clock'){
+  $('bigTime').textContent=d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+  $('bigDate').textContent=d.toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+ }
+}
+setInterval(clock,1000);clock();
+
+function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function render(){
+ const list=state.items.length?state.items:fallback;
+ $('cards').innerHTML=list.slice(0,8).map((x,i)=>'<div class="card"><span class="num">'+(i+1)+'</span>'+esc(x.title||x)+'</div>').join('');
+}
+function setMode(m){
+ state.mode=m||'news';
+ ['hero','bigClock','trivia'].forEach(x=>$(x).style.display='none');
+ $('content').style.display='block';
+ $('mode').textContent=state.mode.toUpperCase();
+ if(state.mode==='clock'){ $('content').style.display='none'; $('bigClock').style.display='flex';}
+ else if(state.mode==='trivia'){ $('content').style.display='none'; $('trivia').style.display='block'; showTrivia();}
+ else if(['anime','gaming','kids','animals','wallpaper'].includes(state.mode)){ $('title').textContent=(state.mode==='wallpaper'?'WALLPAPER':state.mode.toUpperCase()); }
+ else $('title').textContent='AMBIENT NEWS';
+}
+
+function showTrivia(){
+ const t=trivia[Math.floor(Math.random()*trivia.length)];
+ $('question').textContent=t[0];
+ $('answers').innerHTML=t[1].map((a,i)=>'<div class="ans">'+String.fromCharCode(65+i)+'. '+esc(a)+'</div>').join('');
+}
+
+function setBackground(url){
+ if(!url)return;
+ const img=new Image();
+ img.onload=()=>{$('bg').style.backgroundImage='url("'+url.replace(/"/g,'\\"')+'")';};
+ img.src=url;
+}
+const wallpaper={
+ anime:'https://loremflickr.com/1920/1080/anime',
+ gaming:'https://loremflickr.com/1920/1080/gaming',
+ kids:'https://loremflickr.com/1920/1080/kids',
+ animals:'https://loremflickr.com/1920/1080/wildlife',
+ wallpaper:'https://loremflickr.com/1920/1080/nature'
+};
+function startWallpaper(mode){
+ setMode(mode); setBackground(wallpaper[mode]||wallpaper.wallpaper);
+ $('tag').textContent='VISUAL AMBIENT • '+mode.toUpperCase();
+}
+
+async function fetchFeed(url){
+ try{
+  const r=await fetch('https://api.allorigins.win/raw?url='+encodeURIComponent(url),{cache:'no-store'});
+  if(!r.ok)throw Error('feed');
+  const text=await r.text();
+  const xml=new DOMParser().parseFromString(text,'text/xml');
+  return [...xml.querySelectorAll('item')].slice(0,12).map(n=>({title:n.querySelector('title')?.textContent?.trim()||''}));
+ }catch(e){return []}
+}
+async function loadNews(){
+ let all=[];
+ for(const f of feeds){ const x=await fetchFeed(f); all=all.concat(x); if(all.length>=8)break; }
+ if(all.length)state.items=all.slice(0,8);
+ else state.items=fallback.map(title=>({title}));
+ render();
+}
+
+function showHero(item){
+ if(!item)return;
+ $('content').style.display='none'; $('hero').style.display='flex';
+ $('heroTitle').textContent=item.title||'Ambient News';
+ $('heroText').textContent=item.description||'';
+ if(item.image)setBackground(item.image);
+}
+function hideHero(){ $('hero').style.display='none'; $('content').style.display='block';}
+
+function setItems(items){
+ if(Array.isArray(items)) state.items=items.map(x=>typeof x==='string'?{title:x}:x);
+ render();
+}
+function handle(msg){
+ if(msg==null)return;
+ let o=msg;
+ if(typeof msg==='string'){try{o=JSON.parse(msg)}catch(_){o={type:msg}}}
+ const type=String(o.type||o.action||o.command||'').toLowerCase();
+ if(type==='news'||type==='refresh'){state.mode='news';loadNews();setMode('news');return}
+ if(type==='clock'||type==='time'){setMode('clock');return}
+ if(type==='trivia'){setMode('trivia');return}
+ if(type==='anime'||type==='gaming'||type==='kids'||type==='animals'||type==='wallpaper'){startWallpaper(type);return}
+ if(type==='mode'){setMode(o.mode);return}
+ if(type==='items'||type==='setitems'||type==='newsitems'){setItems(o.items||o.data||[]);return}
+ if(type==='show'||type==='article'||type==='card'){showHero(o.item||o);return}
+ if(type==='hide'||type==='home'){hideHero();return}
+ if(type==='background'||type==='setbackground'){setBackground(o.url||o.image);return}
+ if(type==='location'){state.location=o.value||o.location||state.location;$('location').textContent='LOCATION • '+state.location;return}
+ if(type==='auto'){state.auto=o.enabled!==false;return}
+ if(type==='interval'){state.interval=Math.max(5000,Number(o.ms||o.interval||15000));restartRotation();return}
+ if(type==='ping'){send({type:'pong',version:'1.0'});return}
+ // Generic image/content support
+ if(o.image||o.imageUrl){setBackground(o.image||o.imageUrl)}
+ if(o.title||o.headline){showHero(o)}
+}
+
+function send(obj){
+ try{ if(window.castReceiverContext) window.castReceiverContext.sendCustomMessage(NS, null, obj); }catch(e){}
+}
+
+function rotate(){
+ if(!state.auto||state.mode!=='news'||!state.items.length)return;
+ state.index=(state.index+1)%state.items.length;
+}
+function restartRotation(){
+ clearInterval(state.rotation);
+ state.rotation=setInterval(rotate,state.interval);
+}
+render();restartRotation();loadNews();
+
+try{
+ window.castReceiverContext=cast.framework.CastReceiverContext.getInstance();
+ const options=new cast.framework.CastReceiverOptions();
+ options.disableIdleTimeout=true;
+ window.castReceiverContext.addCustomMessageListener(NS,event=>handle(event.data));
+ window.castReceiverContext.start(options);
+ window.castReceiverContext.addEventListener(cast.framework.system.EventType.SENDER_CONNECTED,e=>{$('status').textContent='connected';send({type:'receiver_ready',version:'1.0'});});
+ window.castReceiverContext.addEventListener(cast.framework.system.EventType.SENDER_DISCONNECTED,e=>{$('status').textContent='receiver ready';});
+}catch(e){$('status').textContent='receiver load error';console.error(e)}
+
+})();
+</script>
+</body>
+</html>
