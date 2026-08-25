@@ -350,6 +350,8 @@ function rotate(){
  if(!state.auto || state.mode!=='news' || !state.items.length)return;
 
  state.index=(state.index+1)%state.items.length;
+ state.ticks=(state.ticks||0)+1;
+ $('status').textContent='ROTATE '+state.ticks+' • INDEX '+state.index+' • '+state.items.length+' CARDS';
 
  const item=state.items[state.index];
 
