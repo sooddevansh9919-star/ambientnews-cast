@@ -189,12 +189,12 @@ function handle(msg){
      )
    );
 
-   if(o.interval){
-     state.interval=Math.max(
-       5000,
-       Number(o.interval)*60000
-     );
-   }
+   /*
+    * TEST MODE:
+    * rotate every 15 seconds.
+    * We will make this configurable later.
+    */
+   state.interval=15000;
 
    if(o.location){
      state.location=o.location;
@@ -203,14 +203,21 @@ function handle(msg){
 
    $('mode').textContent='NEWS';
 
-   render();
-
    const current=state.items[state.index];
 
-   if(current && current.image){
-     setBackground(current.image);
+   if(current){
+     $('title').textContent =
+       current.title || 'Ambient News';
+
+     $('tag').textContent =
+       current.tag || 'LIVE NEWS';
+
+     if(current.image){
+       setBackground(current.image);
+     }
    }
 
+   render();
    restartRotation();
 
    console.log(
@@ -340,30 +347,56 @@ function send(obj){
 }
 
 function rotate(){
- if(!state.auto||state.mode!=='news'||!state.items.length)return;
+ if(!state.auto || state.mode!=='news' || !state.items.length)return;
 
  state.index=(state.index+1)%state.items.length;
 
  const item=state.items[state.index];
 
- if(item){
-   $('cards').innerHTML=state.items
-     .slice(state.index)
-     .concat(state.items.slice(0,state.index))
-     .slice(0,8)
-     .map((x,i)=>
-       '<div class="card"><span class="num">'+
-       (i+1)+
-       '</span>'+
-       esc(x.title||x)+
-       '</div>'
-     )
-     .join('');
+ if(!item)return;
 
-   if(item.image){
-     setBackground(item.image);
-   }
+ /*
+  * Show the CURRENT story as the main ambient content.
+  */
+ $('title').textContent =
+   item.title || 'Ambient News';
+
+ $('tag').textContent =
+   item.tag || 'LIVE NEWS';
+
+ /*
+  * Put the story description below the headline
+  * when the sender supplied one.
+  */
+ $('location').textContent =
+   item.description || state.location || '';
+
+ /*
+  * Use the story image when available.
+  */
+ if(item.image){
+   setBackground(item.image);
  }
+
+ /*
+  * Keep the 8-card overview synchronized with
+  * the currently displayed story.
+  */
+ $('cards').innerHTML=state.items
+   .map((x,i)=>
+     '<div class="card" style="' +
+     (i===state.index
+       ? 'border:2px solid rgba(118,183,255,.9);'
+       : '') +
+     '">' +
+     '<span class="num">'+(i+1)+'</span>'+
+     esc(x.title||x)+
+     '</div>'
+   )
+   .join('');
+
+ $('mode').textContent =
+   'NEWS • '+(state.index+1)+' / '+state.items.length;
 }
 
 function restartRotation(){
