@@ -2,431 +2,124 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Ambient News</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Ambient News Cast</title>
+<script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
 <style>
-:root{--bg:#061525;--panel:#0b2033;--text:#f5f8fb;--muted:#9bb6ce;--accent:#76b7ff}
-*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;color:var(--text);font-family:Arial,Helvetica,sans-serif}
-#app{position:relative;width:100%;height:100%;background:linear-gradient(135deg,#061525,#092a45);overflow:hidden}
-#bg{position:absolute;inset:0;background-size:cover;background-position:center;filter:brightness(.62);transition:opacity .8s}
-#shade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(0,12,24,.9),rgba(0,12,24,.55),rgba(0,12,24,.22))}
-#content{position:relative;z-index:2;padding:4.5vh 4vw;width:100%;height:100%}
-h1{margin:0;font-size:5.4vw;letter-spacing:.02em} .sub{font-size:2.1vw;color:var(--muted);margin:.7vh 0}
-#clock{position:absolute;right:4vw;top:4vh;font-size:4vw;font-weight:300}
-#cards{margin-top:3vh;display:grid;gap:1.05vh;max-width:92vw}
-.card{background:rgba(6,24,40,.82);border:1px solid rgba(255,255,255,.06);border-radius:1.1vw;padding:1.1vh 1.5vw;font-size:2.15vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.num{display:inline-block;width:2.6vw;color:#fff}
-#footer{position:absolute;left:4vw;bottom:3vh;color:#9bb6ce;font-size:1.6vw}
-#mode{position:absolute;right:4vw;bottom:3vh;font-size:1.6vw;color:#76b7ff}
-#hero{display:none;position:absolute;inset:0;z-index:5;padding:7vh 7vw;align-items:flex-end;background:rgba(0,0,0,.18)}
-#hero .box{max-width:82vw;text-shadow:0 2px 12px #000}
-#hero h2{font-size:5vw;margin:0 0 1vh}.heroText{font-size:2.2vw;color:#e5eef7}
-#bigClock{display:none;position:absolute;inset:0;z-index:6;align-items:center;justify-content:center;flex-direction:column;background:rgba(0,0,0,.18)}
-#bigClock .time{font-size:15vw;font-weight:200}.date{font-size:3vw;color:var(--muted)}
-#trivia{display:none;position:absolute;inset:0;z-index:6;padding:9vh 8vw;background:linear-gradient(135deg,#102b45,#071827)}
-#trivia h2{font-size:4.8vw;margin:0 0 4vh}.q{font-size:3.1vw;margin-bottom:3vh}.answers{display:grid;gap:1.2vh}.ans{font-size:2.3vw;padding:1.5vh 2vw;background:rgba(255,255,255,.08);border-radius:1vw}
-#status{
- position:absolute;
- top:0;
- left:0;
- z-index:999;
- background:#ff0000;
- color:#ffffff;
- padding:1vh 1vw;
- font-size:2vw;
- font-weight:bold;
-}
-
+:root{font-family:Arial,Helvetica,sans-serif;color:#f5f8fb;background:#030a14}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#030a14}
+body{background:linear-gradient(135deg,#030a14,#081d30 55%,#030912);}
+#app{width:100%;height:100%;display:flex;flex-direction:column;padding:28px 42px 30px}
+header{display:flex;align-items:center;justify-content:space-between;gap:20px}
+.brand{font-size:38px;font-weight:800;letter-spacing:.5px}.sub{font-size:15px;color:#6ebeff;margin-top:2px;letter-spacing:1.4px}
+.clock{text-align:right;font-size:25px;font-weight:700;white-space:nowrap}.location,.weather{font-size:15px;color:#a0c3e1;margin-top:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card{flex:1;min-height:0;margin-top:18px;padding:28px;border-radius:24px;background:#0a1927;display:flex;flex-direction:column;overflow:hidden}
+.meta{font-size:15px;font-weight:700;color:#5abfff;letter-spacing:.4px}.title{font-size:32px;line-height:1.14;font-weight:800;margin:10px 0 16px}
+.media{width:100%;height:min(38vh,390px);display:flex;align-items:center;justify-content:center;background:#142330;border-radius:15px;overflow:hidden;flex:none}
+.media img{width:100%;height:100%;object-fit:contain;display:block}.media.hidden{display:none}
+.story-wrap{margin-top:14px;min-height:0;flex:1;overflow:hidden;position:relative}.story{font-size:22px;line-height:1.48;color:#dce1e8;white-space:pre-wrap;padding-right:12px;will-change:transform}
+.story-spacer{height:8px}.source{font-size:13px;color:#6e91aa;margin-top:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:none}
+#status{position:fixed;left:42px;bottom:12px;font-size:12px;color:#6e91aa;opacity:.7}
 </style>
 </head>
 <body>
 <div id="app">
- <div id="bg"></div><div id="shade"></div>
- <div id="content">
-  <div id="clock">--:--</div>
-  <h1 id="title">AMBIENT NEWS</h1>
-  <div class="sub" id="tag">LIVE CONTENT • CHROMECAST AMBIENT</div>
-  <div class="sub" id="location">LOCATION • DELHI • INDIA</div>
-  <div id="cards"></div>
-  <div id="footer">Ambient display • tap a card to cast • automatic rotation</div>
-  <div id="mode">NEWS</div>
- </div>
- <div id="hero"><div class="box"><h2 id="heroTitle"></h2><div class="heroText" id="heroText"></div></div></div>
- <div id="bigClock"><div class="time" id="bigTime"></div><div class="date" id="bigDate"></div></div>
- <div id="trivia"><h2>TRIVIA</h2><div class="q" id="question"></div><div class="answers" id="answers"></div></div>
- <div id="status">receiver ready</div>
+<header><div><div class="brand">AMBIENT</div><div class="sub">AUTONOMOUS CONTENT • CAST</div><div id="location" class="location">LOCATION • —</div><div id="weather" class="weather">WEATHER • —</div></div><div id="clock" class="clock">12:00 PM</div></header>
+<section class="card">
+<div id="meta" class="meta">WAITING FOR PHONE</div>
+<div id="title" class="title">Connect Ambient News from your phone.</div>
+<div id="media" class="media hidden"><img id="image" alt=""></div>
+<div class="story-wrap"><div id="story" class="story"></div></div>
+<div id="source" class="source"></div>
+</section>
 </div>
-<script src="//www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
+<div id="status">CAST RECEIVER READY</div>
 <script>
-(function(){
-'use strict';
-const NS='urn:x-cast:com.ambientnews.cards';
+const NAMESPACE='urn:x-cast:com.ambientnews.cards';
+const receiver=cast.framework.CastReceiverContext.getInstance();
+let state={cards:[],index:0,remaining:30000,duration:30000,sentAt:0};
+let timer=null,scrollToken=0;
 const $=id=>document.getElementById(id);
-const state={mode:'news',auto:true,items:[],index:0,interval:15000,rotation:null,location:'Delhi • India'};
-const trivia=[
- ['Which planet is known as the Red Planet?',['Earth','Mars','Venus','Jupiter'],1],
- ['What is the largest animal on Earth?',['Elephant','Blue whale','Giraffe','Shark'],1],
- ['How many continents are there?',['5','6','7','8'],2],
- ['Which gas do plants absorb?',['Oxygen','Nitrogen','Carbon dioxide','Helium'],2],
- ['What is the fastest land animal?',['Lion','Cheetah','Horse','Tiger'],1],
- ['Which ocean is the largest?',['Atlantic','Indian','Pacific','Arctic'],2],
- ['What is the capital of India?',['Mumbai','Delhi','Kolkata','Chennai'],1],
- ['Which animal is famous for black-and-white stripes?',['Panda','Zebra','Penguin','Skunk'],1]
-];
-const fallback=[
- 'Global headlines and major world developments',
- 'India • technology • business • science',
- 'Weather, travel and important local updates',
- 'Space discoveries and science stories',
- 'Gaming • movies • entertainment',
- 'Wildlife and nature highlights',
- 'Kids learning • fun facts • trivia',
- 'Anime • wallpapers • visual inspiration'
-];
-const feeds=[
- 'https://feeds.bbci.co.uk/news/world/rss.xml',
- 'https://feeds.bbci.co.uk/news/technology/rss.xml',
- 'https://feeds.bbci.co.uk/news/science_and_environment/rss.xml'
-];
-function clock(){
- const d=new Date();
- $('clock').textContent=d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:false});
- if(state.mode==='clock'){
-  $('bigTime').textContent=d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
-  $('bigDate').textContent=d.toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
- }
+function escText(v){return v==null?'':String(v)}
+function updateClock(){ $('clock').textContent=new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); }
+setInterval(updateClock,1000); updateClock();
+function stopScroll(){scrollToken++;$('story').style.transform='translateY(0px)';}
+function render(card, initialElapsedMs=0){
+  stopScroll();
+  if(!card) return;
+  $('meta').textContent=escText(card.tag)+'   •   '+(state.index+1)+' / '+state.cards.length;
+  $('title').textContent=escText(card.title)||'Untitled';
+  $('location').textContent='LOCATION • '+escText(state.location||'—')+(state.country?' • '+state.country:'');
+  $('weather').textContent=escText(state.weather||'WEATHER • —');
+  const visual=['ANIME','GAMING','WALLPAPERS'].includes(card.tag);
+  const body=visual?'':escText(card.body).trim();
+  const media=$('media'), img=$('image');
+  if(card.image){media.classList.remove('hidden');img.src=card.image;img.onerror=()=>media.classList.add('hidden');}
+  else media.classList.add('hidden');
+  $('story').textContent=body;
+  $('source').textContent=escText(card.tag)+'  •  '+(state.index+1)+'/'+state.cards.length+'  •  '+Math.round(state.duration/1000)+' SEC';
+  requestAnimationFrame(()=>startScroll(state.duration, Math.max(0, initialElapsedMs)));
 }
-setInterval(clock,1000);clock();
-
-function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-function render(){
- const list=state.items.length?state.items:fallback;
- $('cards').innerHTML=list.slice(0,8).map((x,i)=>'<div class="card"><span class="num">'+(i+1)+'</span>'+esc(x.title||x)+'</div>').join('');
+function startScroll(slotMs, initialElapsedMs=0){
+  const token=scrollToken; const wrap=document.querySelector('.story-wrap'); const story=$('story');
+  if(!story.textContent.trim()) return;
+  requestAnimationFrame(()=>{
+    if(token!==scrollToken)return;
+    const max=Math.max(0,story.scrollHeight-wrap.clientHeight);
+    if(max<=8)return;
+    const downMs=Math.max(5000,Math.min(20000,max*12));
+    const upMs=Math.max(3500,Math.min(12000,max*9));
+    const pause=2500;
+    const start=performance.now()-Math.max(0,initialElapsedMs);
+    function frame(now){
+      if(token!==scrollToken)return;
+      const elapsed=now-start;
+      let y=0;
+      if(elapsed<=pause)y=0;
+      else if(elapsed<=pause+downMs)y=max*((elapsed-pause)/downMs);
+      else if(elapsed<=pause+downMs+pause)y=max;
+      else if(elapsed<=pause+downMs+pause+upMs)y=max*(1-(elapsed-pause-downMs-pause)/upMs);
+      else { requestAnimationFrame(frame); return; }
+      story.style.transform='translateY('+(-y)+'px)';
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  });
 }
-function setMode(m){
- state.mode=m||'news';
- ['hero','bigClock','trivia'].forEach(x=>$(x).style.display='none');
- $('content').style.display='block';
- $('mode').textContent=state.mode.toUpperCase();
- if(state.mode==='clock'){ $('content').style.display='none'; $('bigClock').style.display='flex';}
- else if(state.mode==='trivia'){ $('content').style.display='none'; $('trivia').style.display='block'; showTrivia();}
- else if(['anime','gaming','kids','animals','wallpaper'].includes(state.mode)){ $('title').textContent=(state.mode==='wallpaper'?'WALLPAPER':state.mode.toUpperCase()); }
- else $('title').textContent='AMBIENT NEWS';
+function schedule(){
+  if(timer)clearTimeout(timer);
+  if(!state.cards.length)return;
+  // Never invent a new category/batch on the receiver. The phone owns the
+  // playlist and will send the next batch when its fetch completes.
+  if(state.index>=state.cards.length-1){
+    $('status').textContent='SYNC • WAITING FOR NEXT BATCH';
+    return;
+  }
+  const delay=Math.max(250,state.remaining||state.duration||30000);
+  timer=setTimeout(()=>{
+    if(!state.cards.length)return;
+    state.index++;
+    state.remaining=state.duration;
+    render(state.cards[state.index],0);
+    schedule();
+  },delay);
 }
-
-function showTrivia(){
- const t=trivia[Math.floor(Math.random()*trivia.length)];
- $('question').textContent=t[0];
- $('answers').innerHTML=t[1].map((a,i)=>'<div class="ans">'+String.fromCharCode(65+i)+'. '+esc(a)+'</div>').join('');
-}
-
-function setBackground(url){
- if(!url)return;
- const img=new Image();
- img.onload=()=>{$('bg').style.backgroundImage='url("'+url.replace(/"/g,'\\"')+'")';};
- img.src=url;
-}
-const wallpaper={
- anime:'https://loremflickr.com/1920/1080/anime',
- gaming:'https://loremflickr.com/1920/1080/gaming',
- kids:'https://loremflickr.com/1920/1080/kids',
- animals:'https://loremflickr.com/1920/1080/wildlife',
- wallpaper:'https://loremflickr.com/1920/1080/nature'
-};
-function startWallpaper(mode){
- setMode(mode); setBackground(wallpaper[mode]||wallpaper.wallpaper);
- $('tag').textContent='VISUAL AMBIENT • '+mode.toUpperCase();
-}
-
-async function fetchFeed(url){
- try{
-  const r=await fetch('https://api.allorigins.win/raw?url='+encodeURIComponent(url),{cache:'no-store'});
-  if(!r.ok)throw Error('feed');
-  const text=await r.text();
-  const xml=new DOMParser().parseFromString(text,'text/xml');
-  return [...xml.querySelectorAll('item')].slice(0,12).map(n=>({title:n.querySelector('title')?.textContent?.trim()||''}));
- }catch(e){return []}
-}
-async function loadNews(){
- let all=[];
- for(const f of feeds){ const x=await fetchFeed(f); all=all.concat(x); if(all.length>=8)break; }
- if(all.length)state.items=all.slice(0,8);
- else state.items=fallback.map(title=>({title}));
- render();
-}
-
-function showHero(item){
- if(!item)return;
- $('content').style.display='none'; $('hero').style.display='flex';
- $('heroTitle').textContent=item.title||'Ambient News';
- $('heroText').textContent=item.description||'';
- if(item.image)setBackground(item.image);
-}
-function hideHero(){ $('hero').style.display='none'; $('content').style.display='block';}
-
-function setItems(items){
- if(Array.isArray(items)) state.items=items.map(x=>typeof x==='string'?{title:x}:x);
- render();
-}
-function handle(msg){
- if(msg==null)return;
-
- let o=msg;
-
- if(typeof msg==='string'){
-   try{o=JSON.parse(msg)}
-   catch(_){o={type:msg}}
- }
-
- console.log('AMBIENT MESSAGE:',o);
-
- /*
-  * Android sends the complete current card list.
-  * The TV uses EXACTLY those cards.
-  */
- if(o.type==='cards' && Array.isArray(o.cards)){
-
-   state.mode='news';
-    state.auto=true;
-
-   state.items=o.cards.map(x =>
-     typeof x==='string' ? {title:x} : x
-   );
-
-   state.index=Math.max(
-     0,
-     Math.min(
-       Number(o.start)||0,
-       Math.max(0,state.items.length-1)
-     )
-   );
-
-   /*
-    * TEST MODE:
-    * rotate every 15 seconds.
-    * We will make this configurable later.
-    */
-   state.interval=15000;
-
-   if(o.location){
-     state.location=o.location;
-     $('location').textContent='LOCATION • '+o.location;
-   }
-
-   $('mode').textContent='NEWS';
-
-   const current=state.items[state.index];
-
-   if(current){
-     $('title').textContent =
-       current.title || 'Ambient News';
-
-     $('tag').textContent =
-       current.tag || 'LIVE NEWS';
-
-     $('location').textContent =
-       current.body || state.location || '';
-
-     if(current.image){
-       setBackground(current.image);
-     }
-   }
-
-   render();
-   restartRotation();
-
-   console.log(
-     'CARDS RECEIVED:',
-     state.items.length
-   );
-
-   return;
- }
-
- const type=String(
-   o.type||o.action||o.command||''
- ).toLowerCase();
-
- if(type==='news'||type==='refresh'){
-   state.mode='news';
-   loadNews();
-   setMode('news');
-   return;
- }
-
- if(type==='clock'||type==='time'){
-   setMode('clock');
-   return;
- }
-
- if(type==='trivia'){
-   setMode('trivia');
-   return;
- }
-
- if(
-   type==='anime'||
-   type==='gaming'||
-   type==='kids'||
-   type==='animals'||
-   type==='wallpaper'
- ){
-   startWallpaper(type);
-   return;
- }
-
- if(type==='mode'){
-   setMode(o.mode);
-   return;
- }
-
- if(
-   type==='items'||
-   type==='setitems'||
-   type==='newsitems'
- ){
-   setItems(o.items||o.data||[]);
-   return;
- }
-
- if(
-   type==='show'||
-   type==='article'||
-   type==='card'
- ){
-   showHero(o.item||o);
-   return;
- }
-
- if(type==='hide'||type==='home'){
-   hideHero();
-   return;
- }
-
- if(
-   type==='background'||
-   type==='setbackground'
- ){
-   setBackground(o.url||o.image);
-   return;
- }
-
- if(type==='location'){
-   state.location=
-     o.value||o.location||state.location;
-
-   $('location').textContent=
-     'LOCATION • '+state.location;
-
-   return;
- }
-
- if(type==='auto'){
-   state.auto=o.enabled!==false;
-   restartRotation();
-   return;
- }
-
- if(type==='interval'){
-   state.interval=Math.max(
-     5000,
-     Number(o.ms||o.interval||15000)
-   );
-
-   restartRotation();
-   return;
- }
-
- if(type==='ping'){
-   send({
-     type:'pong',
-     version:'1.0'
-   });
-
-   return;
- }
-
- if(o.image||o.imageUrl){
-   setBackground(
-     o.image||o.imageUrl
-   );
- }
-
- if(o.title||o.headline){
-   showHero(o);
- }
-}
-
-function send(obj){
- try{ if(window.castReceiverContext) window.castReceiverContext.sendCustomMessage(NS, null, obj); }catch(e){}
-}
-
-function rotate(){
- if(!state.auto || state.mode!=='news' || !state.items.length)return;
-
- state.index=(state.index+1)%state.items.length;
- state.ticks=(state.ticks||0)+1;
-
- const item=state.items[state.index];
- if(!item)return;
-
- $('title').textContent =
-   item.title || 'Ambient News';
-
- $('tag').textContent =
-   item.tag || 'LIVE NEWS';
-
- $('location').textContent =
-   item.body || state.location || '';
-
- if(item.image){
-   setBackground(item.image);
- }else{
-   $('bg').style.backgroundImage='none';
- }
-
- $('mode').textContent =
-   'NEWS • '+(state.index+1)+' / '+state.items.length;
-
- $('cards').innerHTML=state.items
-   .map((x,i)=>
-     '<div class="card" style="' +
-     (i===state.index
-       ? 'border:2px solid rgba(118,183,255,.9);'
-       : '') +
-     '">' +
-     '<span class="num">'+(i+1)+'</span>'+
-     esc(x.title||x)+
-     '</div>'
-   )
-   .join('');
-
- $('status').textContent =
-   'AUTO • ARTICLE '+(state.index+1)+' / '+state.items.length;
-}
-
-function restartRotation(){
- clearInterval(state.rotation);
-
- state.rotation=setInterval(
-   rotate,
-   Math.max(5000, state.interval || 15000)
- );
-}
-render();
-restartRotation();
-
-try{
- window.castReceiverContext=cast.framework.CastReceiverContext.getInstance();
- const options=new cast.framework.CastReceiverOptions();
- options.disableIdleTimeout=true;
- window.castReceiverContext.addCustomMessageListener(NS,event=>handle(event.data));
- window.castReceiverContext.start(options);
- window.castReceiverContext.addEventListener(cast.framework.system.EventType.SENDER_CONNECTED,e=>{$('status').textContent='connected';send({type:'receiver_ready',version:'1.0'});});
- window.castReceiverContext.addEventListener(cast.framework.system.EventType.SENDER_DISCONNECTED,e=>{$('status').textContent='receiver ready';});
-}catch(e){$('status').textContent='receiver load error';console.error(e)}
-
-})();
+receiver.addCustomMessageListener(NAMESPACE,event=>{
+  try{
+    const p=typeof event.data==='string'?JSON.parse(event.data):event.data;
+    if(!p||p.type!=='cards'||!Array.isArray(p.cards))return;
+    state={...state,...p};
+    state.cards=p.cards; state.index=Math.max(0,Math.min(Number(p.start)||0,state.cards.length-1));
+    state.remaining=Math.max(250,Number(p.interval)||Number(p.duration)||30000);
+    state.duration=Math.max(1000,Number(p.duration)||state.remaining||30000);
+    state.sentAt=Number(p.sentAt)||Date.now();
+    const elapsed=Math.max(0, state.duration-state.remaining);
+    $('status').textContent='SYNC • '+state.index+'/'+state.cards.length+' • '+Math.round(state.remaining/1000)+' SEC';
+    render(state.cards[state.index],elapsed);
+    schedule();
+  }catch(e){$('status').textContent='CAST MESSAGE ERROR';}
+});
+receiver.start();
 </script>
 </body>
 </html>
