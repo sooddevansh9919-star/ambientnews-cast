@@ -8,7 +8,7 @@
 <style>
 :root{font-family:Arial,Helvetica,sans-serif;color:#f5f8fb;background:#030a14}
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#030a14}
-body{background:linear-gradient(135deg,#030a14,#081d30 55%,#030912);}
+body{background:linear-gradient(135deg,#030a14,#081d30 55%,#030912)}
 #app{width:100%;height:100%;display:flex;flex-direction:column;padding:28px 42px 30px}
 header{display:flex;align-items:center;justify-content:space-between;gap:20px}
 .brand{font-size:38px;font-weight:800;letter-spacing:.5px}.sub{font-size:15px;color:#6ebeff;margin-top:2px;letter-spacing:1.4px}
@@ -17,20 +17,14 @@ header{display:flex;align-items:center;justify-content:space-between;gap:20px}
 .meta{font-size:15px;font-weight:700;color:#5abfff;letter-spacing:.4px;flex:none}.title{font-size:32px;line-height:1.14;font-weight:800;margin:10px 0 18px;max-height:2.3em;overflow:hidden;flex:none}
 .content-grid{display:grid;grid-template-columns:minmax(280px,42%) minmax(0,58%);gap:26px;flex:1;min-height:0;overflow:hidden;align-items:stretch}
 .content-grid.no-media{grid-template-columns:minmax(0,1fr)}
-.media{width:100%;height:100%;min-height:0;display:flex;align-items:center;justify-content:center;background:#142330;border-radius:15px;overflow:hidden}
-.media img{width:100%;height:100%;object-fit:contain;display:block;max-width:100%;max-height:100%}.media.hidden{display:none}
+.media{width:100%;height:100%;min-height:0;display:flex;align-items:center;justify-content:center;background:#142330;border-radius:15px;overflow:hidden;position:relative}
+.media img{width:100%;height:100%;object-fit:contain;display:block;max-width:100%;max-height:100%;opacity:0;transition:opacity .15s linear}.media.ready img{opacity:1}.media.hidden{display:none}
+.media::after{content:'LOADING IMAGE';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;letter-spacing:1px;color:#7894aa;background:#142330}.media.ready::after{display:none}
 .story-wrap{min-width:0;min-height:0;height:100%;overflow:hidden;position:relative;display:block}
 .story{font-size:22px;line-height:1.48;color:#dce1e8;white-space:pre-wrap;padding:0 12px 12px 0;will-change:transform;overflow:visible}
-.story-spacer{height:8px}.source{font-size:13px;color:#6e91aa;margin-top:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:none}
+.source{font-size:13px;color:#6e91aa;margin-top:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:none}
 #status{position:fixed;left:42px;bottom:12px;font-size:12px;color:#6e91aa;opacity:.7}
-@media (max-width:900px){
-  #app{padding:18px 22px 24px}
-  .brand{font-size:30px}.clock{font-size:21px}
-  .card{padding:20px}
-  .content-grid{grid-template-columns:minmax(210px,40%) minmax(0,60%);gap:18px}
-  .title{font-size:27px}
-  .story{font-size:19px}
-}
+@media (max-width:900px){#app{padding:18px 22px 24px}.brand{font-size:30px}.clock{font-size:21px}.card{padding:20px}.content-grid{grid-template-columns:minmax(210px,40%) minmax(0,60%);gap:18px}.title{font-size:27px}.story{font-size:19px}}
 </style>
 </head>
 <body>
@@ -50,55 +44,83 @@ header{display:flex;align-items:center;justify-content:space-between;gap:20px}
 <script>
 const NAMESPACE='urn:x-cast:com.ambientnews.cards';
 const receiver=cast.framework.CastReceiverContext.getInstance();
-let state={cards:[],index:0,remaining:30000,duration:30000,sentAt:0};
-let timer=null,scrollToken=0;
+
+const DEFAULT_DURATION=30000;
+const MIN_DURATION=10000;
+const MAX_DURATION=120000;
+const IMAGE_TIMEOUT=9000;
+const SCROLL_TICK=33;
+
+let state={
+  cards:[], index:0, duration:DEFAULT_DURATION, remaining:DEFAULT_DURATION,
+  sentAt:0, deadlineAt:0, location:'—', country:'', weather:'WEATHER • —'
+};
+let cardTimer=null;
+let scrollToken=0;
+let renderToken=0;
+let activeImageUrl='';
+let lastPayloadKey='';
+let serverClockOffsetMs=0;
+const imagePromises=new Map();
+
 const $=id=>document.getElementById(id);
-function escText(v){return v==null?'':String(v)}
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const text=v=>v==null?'':String(v);
+
 function updateClock(){ $('clock').textContent=new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); }
-setInterval(updateClock,1000); updateClock();
+setInterval(updateClock,1000);updateClock();
+
+function stopTimer(){if(cardTimer){clearTimeout(cardTimer);cardTimer=null;}}
 function stopScroll(){scrollToken++;$('story').style.transform='translateY(0px)';}
-function render(card, initialElapsedMs=0){
-  stopScroll();
-  if(!card) return;
-  $('meta').textContent=escText(card.tag)+'   •   '+(state.index+1)+' / '+state.cards.length;
-  $('title').textContent=escText(card.title)||'Untitled';
-  $('location').textContent='LOCATION • '+escText(state.location||'—')+(state.country?' • '+state.country:'');
-  $('weather').textContent=escText(state.weather||'WEATHER • —');
-  const visual=['ANIME','GAMING','WALLPAPERS'].includes(card.tag);
-  const body=visual?'':escText(card.body).trim();
-  const grid=$('content-grid'), media=$('media'), img=$('image');
-  if(card.image){
-    grid.classList.remove('no-media');
-    media.classList.remove('hidden');
-    img.loading='eager';img.decoding='async';
-    img.onerror=()=>{
-      media.classList.add('hidden');
-      grid.classList.add('no-media');
-      img.removeAttribute('src');
-    };
-    img.src=card.image;
-  } else {
-    media.classList.add('hidden');
-    grid.classList.add('no-media');
-    img.removeAttribute('src');
-  }
-  $('story').textContent=body;
-  $('source').textContent=escText(card.tag)+'  •  '+(state.index+1)+'/'+state.cards.length+'  •  '+Math.round(state.duration/1000)+' SEC';
-  requestAnimationFrame(()=>startScroll(state.duration, Math.max(0, initialElapsedMs)));
+
+function absoluteNow(){return Date.now()+serverClockOffsetMs;}
+
+function imageLoad(url){
+  if(!url)return Promise.resolve(false);
+  const existing=imagePromises.get(url);
+  if(existing)return existing;
+  const p=new Promise(resolve=>{
+    const img=new Image();
+    let done=false;
+    const finish=ok=>{if(done)return;done=true;clearTimeout(timeout);if(ok)img.decode?.().catch(()=>{});resolve(ok);};
+    const timeout=setTimeout(()=>finish(false),IMAGE_TIMEOUT);
+    img.onload=()=>finish(true);
+    img.onerror=()=>finish(false);
+    img.decoding='async';
+    img.loading='eager';
+    img.src=url;
+  });
+  imagePromises.set(url,p);
+  p.then(ok=>{if(!ok)imagePromises.delete(url);});
+  return p;
 }
-function startScroll(slotMs, initialElapsedMs=0){
-  const token=scrollToken; const wrap=document.querySelector('.story-wrap'); const story=$('story');
-  if(!story.textContent.trim()) return;
+
+function preloadAdjacent(index){
+  const a=state.cards[index];
+  const b=state.cards[index+1];
+  if(a&&a.image)imageLoad(a.image);
+  if(b&&b.image)imageLoad(b.image);
+}
+
+function scrollForReadableSlot(slotMs, initialElapsedMs){
+  const token=++scrollToken;
+  const wrap=document.querySelector('.story-wrap');
+  const story=$('story');
   requestAnimationFrame(()=>{
     if(token!==scrollToken)return;
     const max=Math.max(0,story.scrollHeight-wrap.clientHeight);
     if(max<=8)return;
-    const pause=Math.min(2500,Math.max(900,slotMs/8));
-    // Long articles use almost the complete card slot. At 30 seconds this gives
-    // roughly 25+ seconds of reading/scrolling; at 10-second test mode it scales
-    // down automatically. Stay at the bottom rather than scrolling back up.
-    const downMs=Math.max(3500,Math.min(Math.max(3500,slotMs-pause-250),max*12));
+
+    // The receiver owns presentation speed.  Use a deliberately slow,
+    // content-aware reading rate rather than pixels/second derived from a
+    // short minimum.  A long card should use almost the whole slot.
+    const pause=Math.min(3500,Math.max(2500,slotMs*0.12));
+    const travel=Math.max(1000,slotMs-pause-500);
+    const minTravel=9000;
+    const byDistance=Math.max(minTravel,max*28);
+    const downMs=Math.min(travel,Math.max(minTravel,byDistance));
     const start=performance.now()-Math.max(0,initialElapsedMs);
+
     function frame(now){
       if(token!==scrollToken)return;
       const elapsed=now-start;
@@ -106,45 +128,151 @@ function startScroll(slotMs, initialElapsedMs=0){
       if(elapsed<=pause)y=0;
       else if(elapsed<=pause+downMs)y=max*((elapsed-pause)/downMs);
       else y=max;
-      story.style.transform='translateY('+(-y)+'px)';
-      if(elapsed < slotMs) requestAnimationFrame(frame);
+      story.style.transform='translate3d(0,'+(-y)+'px,0)';
+      if(elapsed<slotMs)requestAnimationFrame(frame);
     }
     requestAnimationFrame(frame);
+    $('status').textContent='SYNC • SCROLL '+Math.round(max)+'PX / '+Math.round(downMs/1000)+' SEC';
   });
 }
-function schedule(){
-  if(timer)clearTimeout(timer);
+
+function render(card, elapsedMs, token){
+  stopScroll();
+  if(!card)return;
+  const grid=$('content-grid'),media=$('media'),img=$('image');
+  const visual=['ANIME','GAMING','WALLPAPERS'].includes(card.tag);
+  const body=visual?'':text(card.body).trim();
+
+  $('meta').textContent=text(card.tag)+'   •   '+(state.index+1)+' / '+state.cards.length;
+  $('title').textContent=text(card.title)||'Untitled';
+  $('location').textContent='LOCATION • '+text(state.location||'—')+(state.country?' • '+state.country:'');
+  $('weather').textContent=text(state.weather||'WEATHER • —');
+  $('source').textContent=text(card.tag)+'  •  '+(state.index+1)+'/'+state.cards.length+'  •  '+Math.round(state.duration/1000)+' SEC';
+  $('story').textContent=body;
+
+  media.classList.remove('ready');
+  activeImageUrl='';
+
+  const finishVisual=()=>{
+    if(token!==renderToken)return;
+    requestAnimationFrame(()=>{
+      if(token!==renderToken)return;
+      scrollForReadableSlot(state.duration,elapsedMs);
+    });
+  };
+
+  if(card.image){
+    grid.classList.remove('no-media');
+    media.classList.remove('hidden');
+    activeImageUrl=card.image;
+    img.removeAttribute('src');
+    imageLoad(card.image).then(ok=>{
+      if(token!==renderToken||activeImageUrl!==card.image)return;
+      if(ok){
+        img.src=card.image;
+        const reveal=()=>{if(token===renderToken&&activeImageUrl===card.image)media.classList.add('ready');};
+        if(img.complete)reveal();else img.onload=reveal;
+        img.onerror=()=>{if(token===renderToken&&activeImageUrl===card.image){media.classList.add('hidden');grid.classList.add('no-media');activeImageUrl='';}};
+      }else{
+        media.classList.add('hidden');grid.classList.add('no-media');activeImageUrl='';
+      }
+      finishVisual();
+    });
+  }else{
+    media.classList.add('hidden');
+    grid.classList.add('no-media');
+    img.removeAttribute('src');
+    finishVisual();
+  }
+
+  preloadAdjacent(state.index);
+}
+
+function currentRemaining(){
+  if(state.deadlineAt>0)return Math.max(0,state.deadlineAt-absoluteNow());
+  return Math.max(0,state.remaining||state.duration||DEFAULT_DURATION);
+}
+
+function advanceTo(index,fromMessage){
   if(!state.cards.length)return;
-  // Never invent a new category/batch on the receiver. The phone owns the
-  // playlist and will send the next batch when its fetch completes.
+  state.index=clamp(index,0,state.cards.length-1);
+  const remaining=currentRemaining();
+  const elapsed=clamp(state.duration-remaining,0,state.duration);
+  render(state.cards[state.index],elapsed,++renderToken);
+  scheduleNext();
+}
+
+function scheduleNext(){
+  stopTimer();
+  if(!state.cards.length)return;
   if(state.index>=state.cards.length-1){
     $('status').textContent='SYNC • WAITING FOR NEXT BATCH';
     return;
   }
-  const delay=Math.max(250,state.remaining||state.duration||30000);
-  timer=setTimeout(()=>{
+
+  const delay=Math.max(50,currentRemaining());
+  cardTimer=setTimeout(()=>{
     if(!state.cards.length)return;
     state.index++;
+    // When the phone has not yet sent a newer card message, use the local
+    // batch timeline. The next phone message will correct/confirm the state.
     state.remaining=state.duration;
-    render(state.cards[state.index],0);
-    schedule();
+    state.deadlineAt=absoluteNow()+state.duration;
+    advanceTo(state.index,false);
   },delay);
 }
+
+function payloadKey(p){
+  const cards=p.cards||[];
+  const first=cards.length?cards[0]:{};
+  const last=cards.length?cards[cards.length-1]:{};
+  return [p.sentAt,p.start,p.duration,cards.length,text(first.title),text(last.title)].join('|');
+}
+
 receiver.addCustomMessageListener(NAMESPACE,event=>{
   try{
     const p=typeof event.data==='string'?JSON.parse(event.data):event.data;
-    if(!p||p.type!=='cards'||!Array.isArray(p.cards))return;
-    state={...state,...p};
-    state.cards=p.cards; state.index=Math.max(0,Math.min(Number(p.start)||0,state.cards.length-1));
-    state.remaining=Math.max(250,Number(p.interval)||Number(p.duration)||30000);
-    state.duration=Math.max(1000,Number(p.duration)||state.remaining||30000);
+    if(!p||p.type!=='cards'||!Array.isArray(p.cards)||!p.cards.length)return;
+
+    const key=payloadKey(p);
+    // Exact duplicate messages are harmless but should not restart animation.
+    if(key===lastPayloadKey)return;
+    lastPayloadKey=key;
+
+    stopTimer();
+    ++renderToken;
+
+    state.cards=p.cards;
+    state.index=clamp(Number(p.start)||0,0,state.cards.length-1);
+    state.duration=clamp(Number(p.duration)||DEFAULT_DURATION,MIN_DURATION,MAX_DURATION);
     state.sentAt=Number(p.sentAt)||Date.now();
-    const elapsed=Math.max(0, state.duration-state.remaining);
-    $('status').textContent='SYNC • '+state.index+'/'+state.cards.length+' • '+Math.round(state.remaining/1000)+' SEC';
-    render(state.cards[state.index],elapsed);
-    schedule();
-  }catch(e){$('status').textContent='CAST MESSAGE ERROR';}
+    state.deadlineAt=Number(p.deadlineAt)||0;
+    state.remaining=Number(p.interval)||state.duration;
+    state.location=text(p.location||'—');
+    state.country=text(p.country||'');
+    state.weather=text(p.weather||'WEATHER • —');
+
+    // Estimate phone/receiver clock offset once per payload.  If deadlineAt
+    // exists, it is authoritative; otherwise use the supplied remaining time.
+    serverClockOffsetMs=0;
+    if(state.sentAt){
+      const suppliedRemaining=Math.max(0,Number(p.interval)||state.duration);
+      const inferredDeadline=state.sentAt+suppliedRemaining;
+      if(!state.deadlineAt)state.deadlineAt=inferredDeadline;
+    }
+
+    const remaining=currentRemaining();
+    const elapsed=clamp(state.duration-remaining,0,state.duration);
+    $('status').textContent='SYNC • READY '+(state.index+1)+'/'+state.cards.length+' • '+Math.ceil(remaining/1000)+' SEC';
+
+    preloadAdjacent(state.index);
+    render(state.cards[state.index],elapsed,++renderToken);
+    scheduleNext();
+  }catch(e){
+    $('status').textContent='CAST MESSAGE ERROR';
+  }
 });
+
 receiver.start();
 </script>
 </body>
