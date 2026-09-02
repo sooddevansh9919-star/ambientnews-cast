@@ -14,12 +14,23 @@ header{display:flex;align-items:center;justify-content:space-between;gap:20px}
 .brand{font-size:38px;font-weight:800;letter-spacing:.5px}.sub{font-size:15px;color:#6ebeff;margin-top:2px;letter-spacing:1.4px}
 .clock{text-align:right;font-size:25px;font-weight:700;white-space:nowrap}.location,.weather{font-size:15px;color:#a0c3e1;margin-top:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .card{flex:1;min-height:0;margin-top:18px;padding:28px;border-radius:24px;background:#0a1927;display:flex;flex-direction:column;overflow:hidden}
-.meta{font-size:15px;font-weight:700;color:#5abfff;letter-spacing:.4px}.title{font-size:32px;line-height:1.14;font-weight:800;margin:10px 0 16px}
-.media{width:100%;height:min(38vh,390px);display:flex;align-items:center;justify-content:center;background:#142330;border-radius:15px;overflow:hidden;flex:none}
-.media img{width:100%;height:100%;object-fit:contain;display:block}.media.hidden{display:none}
-.story-wrap{margin-top:14px;min-height:0;flex:1;overflow:hidden;position:relative}.story{font-size:22px;line-height:1.48;color:#dce1e8;white-space:pre-wrap;padding-right:12px;will-change:transform}
+.meta{font-size:15px;font-weight:700;color:#5abfff;letter-spacing:.4px;flex:none}.title{font-size:32px;line-height:1.14;font-weight:800;margin:10px 0 18px;max-height:2.3em;overflow:hidden;flex:none}
+.content-grid{display:grid;grid-template-columns:minmax(280px,42%) minmax(0,58%);gap:26px;flex:1;min-height:0;overflow:hidden;align-items:stretch}
+.content-grid.no-media{grid-template-columns:minmax(0,1fr)}
+.media{width:100%;height:100%;min-height:0;display:flex;align-items:center;justify-content:center;background:#142330;border-radius:15px;overflow:hidden}
+.media img{width:100%;height:100%;object-fit:contain;display:block;max-width:100%;max-height:100%}.media.hidden{display:none}
+.story-wrap{min-width:0;min-height:0;height:100%;overflow:hidden;position:relative;display:block}
+.story{font-size:22px;line-height:1.48;color:#dce1e8;white-space:pre-wrap;padding:0 12px 12px 0;will-change:transform;overflow:visible}
 .story-spacer{height:8px}.source{font-size:13px;color:#6e91aa;margin-top:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:none}
 #status{position:fixed;left:42px;bottom:12px;font-size:12px;color:#6e91aa;opacity:.7}
+@media (max-width:900px){
+  #app{padding:18px 22px 24px}
+  .brand{font-size:30px}.clock{font-size:21px}
+  .card{padding:20px}
+  .content-grid{grid-template-columns:minmax(210px,40%) minmax(0,60%);gap:18px}
+  .title{font-size:27px}
+  .story{font-size:19px}
+}
 </style>
 </head>
 <body>
@@ -60,7 +71,11 @@ function render(card, initialElapsedMs=0){
     grid.classList.remove('no-media');
     media.classList.remove('hidden');
     img.loading='eager';img.decoding='async';
-    img.onerror=()=>{media.classList.add('hidden');grid.classList.add('no-media');};
+    img.onerror=()=>{
+      media.classList.add('hidden');
+      grid.classList.add('no-media');
+      img.removeAttribute('src');
+    };
     img.src=card.image;
   } else {
     media.classList.add('hidden');
