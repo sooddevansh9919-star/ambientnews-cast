@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Ambient News Cast</title>
+<title>Ambient News Cast V6</title>
 <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
 <style>
 :root{font-family:Arial,Helvetica,sans-serif;color:#f5f8fb;background:#030a14}
@@ -52,7 +52,7 @@ const IMAGE_TIMEOUT=9000;
 const SCROLL_TICK=33;
 
 let state={
-  cards:[], index:0, duration:DEFAULT_DURATION, remaining:DEFAULT_DURATION,
+  cards:[], cardDurations:[], index:0, duration:DEFAULT_DURATION, remaining:DEFAULT_DURATION,
   sentAt:0, deadlineAt:0, location:'—', country:'', weather:'WEATHER • —'
 };
 let cardTimer=null;
@@ -114,10 +114,11 @@ function scrollForReadableSlot(slotMs, initialElapsedMs){
     // The receiver owns presentation speed.  Use a deliberately slow,
     // content-aware reading rate rather than pixels/second derived from a
     // short minimum.  A long card should use almost the whole slot.
-    const pause=Math.min(3500,Math.max(2500,slotMs*0.12));
-    const travel=Math.max(1000,slotMs-pause-500);
-    const minTravel=9000;
-    const byDistance=Math.max(minTravel,max*28);
+    const pause=Math.min(5000,Math.max(3500,slotMs*0.12));
+    const travel=Math.max(1000,slotMs-pause-1000);
+    const minTravel=12000;
+    const maxReadableSpeed=58;
+    const byDistance=Math.ceil(max / maxReadableSpeed * 1000);
     const downMs=Math.min(travel,Math.max(minTravel,byDistance));
     const start=performance.now()-Math.max(0,initialElapsedMs);
 
@@ -188,34 +189,37 @@ function render(card, elapsedMs, token){
   preloadAdjacent(state.index);
 }
 
+function currentCardDuration(){
+  const d=Number(state.cardDurations?.[state.index]);
+  return clamp(d||state.duration||DEFAULT_DURATION,MIN_DURATION,MAX_DURATION);
+}
+
 function currentRemaining(){
   if(state.deadlineAt>0)return Math.max(0,state.deadlineAt-absoluteNow());
-  return Math.max(0,state.remaining||state.duration||DEFAULT_DURATION);
+  return Math.max(0,state.remaining||currentCardDuration());
 }
 
 function advanceTo(index,fromMessage){
   if(!state.cards.length)return;
   state.index=clamp(index,0,state.cards.length-1);
+  state.duration=currentCardDuration();
   const remaining=currentRemaining();
   const elapsed=clamp(state.duration-remaining,0,state.duration);
   render(state.cards[state.index],elapsed,++renderToken);
+  preloadAdjacent(state.index);
   scheduleNext();
 }
 
 function scheduleNext(){
   stopTimer();
   if(!state.cards.length)return;
-  if(state.index>=state.cards.length-1){
-    $('status').textContent='SYNC • WAITING FOR NEXT BATCH';
-    return;
-  }
 
   const delay=Math.max(50,currentRemaining());
   cardTimer=setTimeout(()=>{
     if(!state.cards.length)return;
-    state.index++;
-    // When the phone has not yet sent a newer card message, use the local
-    // batch timeline. The next phone message will correct/confirm the state.
+    if(state.index < state.cards.length-1) state.index++;
+    else state.index=0;
+    state.duration=currentCardDuration();
     state.remaining=state.duration;
     state.deadlineAt=absoluteNow()+state.duration;
     advanceTo(state.index,false);
@@ -243,8 +247,9 @@ receiver.addCustomMessageListener(NAMESPACE,event=>{
     ++renderToken;
 
     state.cards=p.cards;
+    state.cardDurations=Array.isArray(p.cardDurations) ? p.cardDurations.map(v=>clamp(Number(v)||DEFAULT_DURATION,MIN_DURATION,MAX_DURATION)) : [];
     state.index=clamp(Number(p.start)||0,0,state.cards.length-1);
-    state.duration=clamp(Number(p.duration)||DEFAULT_DURATION,MIN_DURATION,MAX_DURATION);
+    state.duration=clamp(Number(state.cardDurations[state.index])||Number(p.duration)||DEFAULT_DURATION,MIN_DURATION,MAX_DURATION);
     state.sentAt=Number(p.sentAt)||Date.now();
     state.deadlineAt=Number(p.deadlineAt)||0;
     state.remaining=Number(p.interval)||state.duration;
