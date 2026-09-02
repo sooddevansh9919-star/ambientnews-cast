@@ -54,7 +54,7 @@ function render(card, initialElapsedMs=0){
   const visual=['ANIME','GAMING','WALLPAPERS'].includes(card.tag);
   const body=visual?'':escText(card.body).trim();
   const media=$('media'), img=$('image');
-  if(card.image){media.classList.remove('hidden');img.src=card.image;img.onerror=()=>media.classList.add('hidden');}
+  if(card.image){media.classList.remove('hidden');img.loading='eager';img.decoding='async';img.src=card.image;img.onerror=()=>media.classList.add('hidden');}
   else media.classList.add('hidden');
   $('story').textContent=body;
   $('source').textContent=escText(card.tag)+'  •  '+(state.index+1)+'/'+state.cards.length+'  •  '+Math.round(state.duration/1000)+' SEC';
@@ -67,9 +67,11 @@ function startScroll(slotMs, initialElapsedMs=0){
     if(token!==scrollToken)return;
     const max=Math.max(0,story.scrollHeight-wrap.clientHeight);
     if(max<=8)return;
-    const downMs=Math.max(5000,Math.min(20000,max*12));
-    const upMs=Math.max(3500,Math.min(12000,max*9));
-    const pause=2500;
+    const pause=Math.min(2500,Math.max(900,slotMs/8));
+    // Long articles use almost the complete card slot. At 30 seconds this gives
+    // roughly 25+ seconds of reading/scrolling; at 10-second test mode it scales
+    // down automatically. Stay at the bottom rather than scrolling back up.
+    const downMs=Math.max(3500,Math.min(Math.max(3500,slotMs-pause-250),max*12));
     const start=performance.now()-Math.max(0,initialElapsedMs);
     function frame(now){
       if(token!==scrollToken)return;
@@ -77,11 +79,9 @@ function startScroll(slotMs, initialElapsedMs=0){
       let y=0;
       if(elapsed<=pause)y=0;
       else if(elapsed<=pause+downMs)y=max*((elapsed-pause)/downMs);
-      else if(elapsed<=pause+downMs+pause)y=max;
-      else if(elapsed<=pause+downMs+pause+upMs)y=max*(1-(elapsed-pause-downMs-pause)/upMs);
-      else { requestAnimationFrame(frame); return; }
+      else y=max;
       story.style.transform='translateY('+(-y)+'px)';
-      requestAnimationFrame(frame);
+      if(elapsed < slotMs) requestAnimationFrame(frame);
     }
     requestAnimationFrame(frame);
   });
