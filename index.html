@@ -28,8 +28,10 @@ header{display:flex;align-items:center;justify-content:space-between;gap:20px}
 <section class="card">
 <div id="meta" class="meta">WAITING FOR PHONE</div>
 <div id="title" class="title">Connect Ambient News from your phone.</div>
+<div id="content-grid" class="content-grid no-media">
 <div id="media" class="media hidden"><img id="image" alt=""></div>
 <div class="story-wrap"><div id="story" class="story"></div></div>
+</div>
 <div id="source" class="source"></div>
 </section>
 </div>
@@ -53,9 +55,18 @@ function render(card, initialElapsedMs=0){
   $('weather').textContent=escText(state.weather||'WEATHER • —');
   const visual=['ANIME','GAMING','WALLPAPERS'].includes(card.tag);
   const body=visual?'':escText(card.body).trim();
-  const media=$('media'), img=$('image');
-  if(card.image){media.classList.remove('hidden');img.loading='eager';img.decoding='async';img.src=card.image;img.onerror=()=>media.classList.add('hidden');}
-  else media.classList.add('hidden');
+  const grid=$('content-grid'), media=$('media'), img=$('image');
+  if(card.image){
+    grid.classList.remove('no-media');
+    media.classList.remove('hidden');
+    img.loading='eager';img.decoding='async';
+    img.onerror=()=>{media.classList.add('hidden');grid.classList.add('no-media');};
+    img.src=card.image;
+  } else {
+    media.classList.add('hidden');
+    grid.classList.add('no-media');
+    img.removeAttribute('src');
+  }
   $('story').textContent=body;
   $('source').textContent=escText(card.tag)+'  •  '+(state.index+1)+'/'+state.cards.length+'  •  '+Math.round(state.duration/1000)+' SEC';
   requestAnimationFrame(()=>startScroll(state.duration, Math.max(0, initialElapsedMs)));
